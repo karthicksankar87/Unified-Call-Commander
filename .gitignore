@@ -1,0 +1,44 @@
+# Node dependencies
+node_modules/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs
+/backend/dist/
+/frontend/build/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+.cache/
+.parcel-cache/
+.next/
+out/
+
+# Environment files
+/backend/.env
+/backend/.env.*
+/frontend/.env
+/frontend/.env.*
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Tooling caches
+.eslintcache
+.babel_cache
+
+# Project-specific
+/backend/dist/
+/frontend/build/
+.prisma/
+node_modules/.cache/
