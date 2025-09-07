@@ -35,14 +35,34 @@ model Customer {
 
 model Call {
   id              Int      @id @default(autoincrement())
+  phoneNumber     String   @default("UNKNOWN")
+  callerName      String?
+  callType        String   @default("INCOMING")
   timestamp       DateTime @default(now())
+  duration        Int      @default(0)
   status          String
+  routedTo        String?
+  routingRuleId   Int?
   routedToUserId  Int?
   customerId      Int?
+  metadata        Json?
   user            User?    @relation(fields: [routedToUserId], references: [id])
   customer        Customer? @relation(fields: [customerId], references: [id])
+  routingRule     RoutingRule? @relation(fields: [routingRuleId], references: [id])
   metrics         Metric[]
   @@index([timestamp])
+  @@index([phoneNumber])
+}
+
+model RoutingRule {
+  id          Int      @id @default(autoincrement())
+  name        String
+  conditions  Json
+  action      Json
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  calls       Call[]
 }
 
 model Metric {

@@ -2,10 +2,16 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 export interface Call {
   id: number;
+  phoneNumber: string;
+  callerName?: string;
+  callType?: string;
   timestamp: string;
+  duration?: number;
   status: 'incoming' | 'active' | 'completed';
+  routedTo?: string;
   routedToUserId?: number;
   customerId?: number;
+  metadata?: any;
   user?: {
     name: string;
     location: {

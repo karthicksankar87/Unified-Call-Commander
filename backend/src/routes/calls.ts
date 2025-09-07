@@ -10,7 +10,7 @@ router.get('/active', async (req, res) => {
     const activeCalls = await prisma.call.findMany({
       where: {
         status: {
-          in: ['incoming', 'active']
+          in: ['incoming', 'active', 'RECEIVED']
         }
       },
       include: {
@@ -155,12 +155,20 @@ router.get('/stats', async (req, res) => {
 // Create a new call (for testing/simulating incoming calls)
 router.post('/', async (req, res) => {
   try {
-    const { customerId, locationId } = req.body;
+    const { phoneNumber, callerName, callType, customerId } = req.body;
+
+    if (!phoneNumber) {
+      return res.status(400).json({ error: 'phoneNumber is required' });
+    }
 
     const newCall = await prisma.call.create({
       data: {
-        status: 'incoming',
-        customerId: customerId || null
+        phoneNumber,
+        callerName: callerName || 'Unknown',
+        callType: callType || 'INCOMING',
+        status: 'RECEIVED',
+        customerId: customerId || null,
+        metadata: {}
       },
       include: {
         customer: {
@@ -173,6 +181,7 @@ router.post('/', async (req, res) => {
     });
     res.json(newCall);
   } catch (error) {
+    console.error('Error creating call:', error);
     res.status(500).json({ error: 'Failed to create call' });
   }
 });

@@ -7,7 +7,7 @@ import Button from '@mui/joy/Button';
 import Chip from '@mui/joy/Chip';
 import Table from '@mui/joy/Table';
 import Sheet from '@mui/joy/Sheet';
-import { Add as AddIcon, Refresh as RefreshIcon, Call as CallIcon, CallEnd as CallEndIcon } from '@mui/icons-material';
+import { Refresh as RefreshIcon, Call as CallIcon, CallEnd as CallEndIcon } from '@mui/icons-material';
 import AppLayout from './AppLayout';
 import { apiService, Call, CallStats } from '../services/api';
 
@@ -28,6 +28,8 @@ const CallManagementJoy: React.FC = () => {
         apiService.getActiveCalls(),
         apiService.getCallStats(),
       ]);
+      console.log('Fetched active calls:', calls);
+      console.log('Fetched stats:', s);
       setActiveCalls(calls);
       setStats(s);
       setError(null);
@@ -76,15 +78,6 @@ const CallManagementJoy: React.FC = () => {
     await fetchActiveCalls();
   };
 
-  const handleCreateTestCall = async () => {
-    try {
-      await apiService.createCall();
-      await fetchActiveCalls();
-    } catch (err) {
-      setError('Failed to create test call');
-      console.error('Error creating test call:', err);
-    }
-  };
 
   if (loading) {
     return (
@@ -138,8 +131,8 @@ const CallManagementJoy: React.FC = () => {
                 <tbody>
                   {activeCalls.map((call) => (
                     <tr key={call.id}>
-                      <td>{call.customer?.name || 'Unknown'}</td>
-                      <td>{call.user?.location?.name || 'Unknown'}</td>
+                      <td>{call.callerName || call.customer?.name || call.phoneNumber}</td>
+                      <td>{call.user?.location?.name || call.routedTo || 'Unassigned'}</td>
                       <td>
                         <Chip size="sm" color={getStatusColor(call.status)}>
                           {call.status}
@@ -187,11 +180,8 @@ const CallManagementJoy: React.FC = () => {
               <Typography level="title-md" gutterBottom>
                 Call Controls
               </Typography>
-              <Button fullWidth variant="solid" startDecorator={<RefreshIcon />} sx={{ mb: 1 }} onClick={handleRefresh}>
+              <Button fullWidth variant="solid" startDecorator={<RefreshIcon />} onClick={handleRefresh}>
                 Refresh Calls
-              </Button>
-              <Button fullWidth variant="outlined" color="success" startDecorator={<AddIcon />} onClick={handleCreateTestCall}>
-                Create Test Call
               </Button>
             </CardContent>
           </Card>
