@@ -7,10 +7,11 @@ export interface Call {
   callType?: string;
   timestamp: string;
   duration?: number;
-  status: 'incoming' | 'active' | 'completed';
+  status: 'incoming' | 'assigned' | 'active' | 'completed' | 'RECEIVED';
   routedTo?: string;
   routedToUserId?: number;
   customerId?: number;
+  location?: string;
   metadata?: any;
   user?: {
     name: string;
@@ -30,6 +31,23 @@ export interface CallStats {
   completedCalls: number;
 }
 
+export interface AnalyticsSummary {
+  totalCallsToday: number;
+  activeCallsNow: number;
+  completedCallsToday: number;
+  avgHandleTimeSecondsToday: number | null;
+  activeStaffNow: number;
+  locationStats: Array<{
+    location: string;
+    callsToday: number;
+    avgHandleTimeSecondsToday: number | null;
+  }>;
+  reasons: Array<{
+    name: string;
+    value: number;
+  }>;
+}
+
 class ApiService {
   private getAuthHeaders(): Record<string, string> {
     const token = localStorage.getItem('authToken');
@@ -45,16 +63,24 @@ class ApiService {
     return response.json();
   }
 
-  async answerCall(callId: number, userId: number): Promise<Call> {
-    const response = await fetch(`${API_BASE_URL}/calls/${callId}/answer`, {
+  async answerCall(call: Call): Promise<Call> {
+    const body = call.routedToUserId ? { userId: call.routedToUserId } : {};
+    const response = await fetch(`${API_BASE_URL}/calls/${call.id}/answer`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         ...this.getAuthHeaders(),
       },
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify(body),
     });
-    if (!response.ok) throw new Error('Failed to answer call');
+    if (!response.ok) {
+      let message = 'Failed to answer call';
+      try {
+        const err = await response.json();
+        if (err?.error) message = err.error;
+      } catch {}
+      throw new Error(message);
+    }
     return response.json();
   }
 
@@ -63,7 +89,14 @@ class ApiService {
       method: 'PUT',
       headers: this.getAuthHeaders(),
     });
-    if (!response.ok) throw new Error('Failed to end call');
+    if (!response.ok) {
+      let message = 'Failed to end call';
+      try {
+        const err = await response.json();
+        if (err?.error) message = err.error;
+      } catch {}
+      throw new Error(message);
+    }
     return response.json();
   }
 
@@ -105,6 +138,30 @@ class ApiService {
   async healthCheck(): Promise<{ status: string; timestamp: string }> {
     const response = await fetch(`${API_BASE_URL}/health`);
     if (!response.ok) throw new Error('Health check failed');
+    return response.json();
+  }
+
+  // Redis Management
+  async initializeRedisStaffAvailability(): Promise<{ 
+    success: boolean; 
+    message: string;
+    staffCount?: number;
+    locationCount?: number;
+  }> {
+    const response = await fetch(`${API_BASE_URL}/routing/initialize-redis`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to initialize Redis staff availability');
+    return response.json();
+  }
+
+  // Analytics
+  async getAnalyticsSummary(): Promise<AnalyticsSummary> {
+    const response = await fetch(`${API_BASE_URL}/analytics/summary`, {
+      headers: this.getAuthHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch analytics summary');
     return response.json();
   }
 }

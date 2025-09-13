@@ -9,10 +9,12 @@ import automationRoutes from './routes/automation';
 import analyticsRoutes from './routes/analytics';
 import callRoutes from './routes/calls';
 import KafkaConsumerService from './services/kafkaConsumer';
+import RedisRoutingService from './services/redisRouting';
 
 const app = express();
 const prisma = new PrismaClient();
 const kafkaConsumer = new KafkaConsumerService();
+const redisRouting = new RedisRoutingService();
 
 // Middleware
 app.use(cors());
@@ -60,6 +62,18 @@ async function initializeKafkaConsumer() {
   }
 }
 
+// Initialize Redis staff availability
+async function initializeRedisAvailability() {
+  try {
+    console.log('Initializing staff availability in Redis...');
+    await redisRouting.initializeStaffAvailability();
+    console.log('Staff availability initialized successfully');
+  } catch (error) {
+    console.error('Failed to initialize staff availability:', error);
+    console.log('Server will continue without staff availability initialization');
+  }
+}
+
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('Received SIGTERM, shutting down gracefully...');
@@ -77,6 +91,7 @@ process.on('SIGINT', async () => {
 
 app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
-  // Initialize Kafka consumer after server starts
+  // Initialize Kafka consumer and Redis availability after server starts
   await initializeKafkaConsumer();
+  await initializeRedisAvailability();
 });

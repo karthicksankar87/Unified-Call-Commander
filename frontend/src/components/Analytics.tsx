@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Box from '@mui/joy/Box';
 import Typography from '@mui/joy/Typography';
 import Card from '@mui/joy/Card';
@@ -6,7 +6,8 @@ import CardContent from '@mui/joy/CardContent';
 import Table from '@mui/joy/Table';
 import Sheet from '@mui/joy/Sheet';
 import AppLayout from './AppLayout';
-import { Phone, AccessTime, Star, People } from '@mui/icons-material';
+import { Phone, AccessTime, People, CheckCircle } from '@mui/icons-material';
+import { apiService, AnalyticsSummary } from '../services/api';
 import {
   PieChart as RePieChart,
   Pie,
@@ -18,50 +19,37 @@ import {
 } from 'recharts';
 
 const AnalyticsJoy: React.FC = () => {
-  const performanceMetrics = [
-    {
-      title: 'Total Calls Today',
-      value: '247',
-      change: '+12%',
-      icon: <Phone fontSize="small" />,
-      color: 'primary',
-    },
-    {
-      title: 'Average Handle Time',
-      value: '4:32',
-      change: '-8%',
-      icon: <AccessTime fontSize="small" />,
-      color: 'success',
-    },
-    {
-      title: 'Customer Satisfaction',
-      value: '94%',
-      change: '+2%',
-      icon: <Star fontSize="small" />,
-      color: 'warning',
-    },
-    {
-      title: 'Active Staff',
-      value: '23',
-      change: '+5%',
-      icon: <People fontSize="small" />,
-      color: 'neutral',
-    },
-  ];
+  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const locationStats = [
-    { location: 'Store #1', calls: 45, avgTime: '4:12', satisfaction: '96%' },
-    { location: 'Store #3', calls: 38, avgTime: '4:45', satisfaction: '92%' },
-    { location: 'Store #5', calls: 52, avgTime: '3:58', satisfaction: '95%' },
-    { location: 'Store #7', calls: 31, avgTime: '5:02', satisfaction: '89%' },
-  ];
+  const formatSeconds = (secs: number | null | undefined): string => {
+    if (!secs && secs !== 0) return '—';
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
 
-  const reasonsData = [
-    { id: 0, value: 35, name: 'Product Information' },
-    { id: 1, value: 28, name: 'Inventory Check' },
-    { id: 2, value: 20, name: 'Appointment Booking' },
-    { id: 3, value: 17, name: 'Returns/Exchanges' },
-  ];
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const data = await apiService.getAnalyticsSummary();
+        setSummary(data);
+        setError(null);
+      } catch (e) {
+        console.error('Failed to load analytics summary', e);
+        setError('Failed to load analytics');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+
+    // Poll every 10 seconds for near real-time updates
+    const id = setInterval(load, 10000);
+    return () => clearInterval(id);
+  }, []);
 
   const PIE_COLORS = ['#1976d2', '#2e7d32', '#ed6c02', '#9c27b0'];
 
@@ -70,6 +58,17 @@ const AnalyticsJoy: React.FC = () => {
       <Typography level="body-md" sx={{ mb: 2 }}>
         Real-time performance metrics and insights across all locations
       </Typography>
+
+      {loading && (
+        <Typography level="body-sm" sx={{ color: 'text.tertiary', mb: 2 }}>
+          Loading analytics...
+        </Typography>
+      )}
+      {error && (
+        <Typography level="body-sm" sx={{ color: 'danger.600', mb: 2 }}>
+          {error}
+        </Typography>
+      )}
 
       <Box
         sx={{
@@ -82,37 +81,62 @@ const AnalyticsJoy: React.FC = () => {
           },
         }}
       >
-        {performanceMetrics.map((m, i) => (
-          <Card key={i} variant="soft">
-            <CardContent>
-              <Box
-                sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}
-              >
-                <Sheet
-                  variant="solid"
-                  color={m.color as any}
-                  sx={{ p: 0.5, borderRadius: 'sm' }}
-                >
-                  {m.icon}
-                </Sheet>
-                <Typography level="body-sm" sx={{ color: 'text.tertiary' }}>
-                  {m.title}
-                </Typography>
-              </Box>
-              <Typography level="h2">{m.value}</Typography>
-              <Typography
-                level="body-sm"
-                sx={{
-                  color: m.change.startsWith('+')
-                    ? 'success.600'
-                    : 'danger.600',
-                }}
-              >
-                {m.change} from yesterday
+        {/* Metric cards */}
+        <Card variant="soft">
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <Sheet variant="solid" color="primary" sx={{ p: 0.5, borderRadius: 'sm' }}>
+                <Phone fontSize="small" />
+              </Sheet>
+              <Typography level="body-sm" sx={{ color: 'text.tertiary' }}>
+                Total Calls Today
               </Typography>
-            </CardContent>
-          </Card>
-        ))}
+            </Box>
+            <Typography level="h2">{summary?.totalCallsToday ?? '—'}</Typography>
+          </CardContent>
+        </Card>
+
+        <Card variant="soft">
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <Sheet variant="solid" color="success" sx={{ p: 0.5, borderRadius: 'sm' }}>
+                <AccessTime fontSize="small" />
+              </Sheet>
+              <Typography level="body-sm" sx={{ color: 'text.tertiary' }}>
+                Average Handle Time (Today)
+              </Typography>
+            </Box>
+            <Typography level="h2">{formatSeconds(summary?.avgHandleTimeSecondsToday)}</Typography>
+          </CardContent>
+        </Card>
+
+        <Card variant="soft">
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <Sheet variant="solid" color="neutral" sx={{ p: 0.5, borderRadius: 'sm' }}>
+                <People fontSize="small" />
+              </Sheet>
+              <Typography level="body-sm" sx={{ color: 'text.tertiary' }}>
+                Active Staff (Now)
+              </Typography>
+            </Box>
+            <Typography level="h2">{summary?.activeStaffNow ?? '—'}</Typography>
+          </CardContent>
+        </Card>
+
+        <Card variant="soft">
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+              <Sheet variant="solid" color="warning" sx={{ p: 0.5, borderRadius: 'sm' }}>
+                <CheckCircle fontSize="small" />
+              </Sheet>
+              <Typography level="body-sm" sx={{ color: 'text.tertiary' }}>
+                Completed (Today)
+              </Typography>
+            </Box>
+            <Typography level="h2">{summary?.completedCallsToday ?? '—'}</Typography>
+          </CardContent>
+        </Card>
       </Box>
 
       <Box
@@ -133,18 +157,16 @@ const AnalyticsJoy: React.FC = () => {
                 <thead>
                   <tr>
                     <th>Location</th>
-                    <th style={{ textAlign: 'right' }}>Total Calls</th>
+                    <th style={{ textAlign: 'right' }}>Total Calls (Today)</th>
                     <th style={{ textAlign: 'right' }}>Avg. Handle Time</th>
-                    <th style={{ textAlign: 'right' }}>Satisfaction</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {locationStats.map((s) => (
+                  {(summary?.locationStats || []).map((s) => (
                     <tr key={s.location}>
                       <td>{s.location}</td>
-                      <td style={{ textAlign: 'right' }}>{s.calls}</td>
-                      <td style={{ textAlign: 'right' }}>{s.avgTime}</td>
-                      <td style={{ textAlign: 'right' }}>{s.satisfaction}</td>
+                      <td style={{ textAlign: 'right' }}>{s.callsToday}</td>
+                      <td style={{ textAlign: 'right' }}>{formatSeconds(s.avgHandleTimeSecondsToday)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -156,7 +178,7 @@ const AnalyticsJoy: React.FC = () => {
         <Card>
           <CardContent>
             <Typography level="title-md" gutterBottom>
-              Top Call Reasons
+              Top Call Reasons (Today)
             </Typography>
             <Box sx={{ width: '100%', height: 280 }}>
               <ResponsiveContainer>
@@ -169,7 +191,7 @@ const AnalyticsJoy: React.FC = () => {
                   />
                   <ReLegend verticalAlign="bottom" align="center" />
                   <Pie
-                    data={reasonsData}
+                    data={(summary?.reasons || []).map((r, idx) => ({ id: idx, name: r.name, value: r.value }))}
                     dataKey="value"
                     nameKey="name"
                     innerRadius={50}
@@ -181,9 +203,9 @@ const AnalyticsJoy: React.FC = () => {
                       `${Math.round((percent || 0) * 100)}%`
                     }
                   >
-                    {reasonsData.map((entry, index) => (
+                    {(summary?.reasons || []).map((entry, index) => (
                       <Cell
-                        key={`cell-${entry.id}`}
+                        key={`cell-${index}`}
                         fill={PIE_COLORS[index % PIE_COLORS.length]}
                       />
                     ))}

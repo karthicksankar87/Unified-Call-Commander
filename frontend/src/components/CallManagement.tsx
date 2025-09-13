@@ -7,7 +7,11 @@ import Button from '@mui/joy/Button';
 import Chip from '@mui/joy/Chip';
 import Table from '@mui/joy/Table';
 import Sheet from '@mui/joy/Sheet';
-import { Refresh as RefreshIcon, Call as CallIcon, CallEnd as CallEndIcon } from '@mui/icons-material';
+import {
+  Refresh as RefreshIcon,
+  Call as CallIcon,
+  CallEnd as CallEndIcon,
+} from '@mui/icons-material';
 import AppLayout from './AppLayout';
 import { apiService, Call, CallStats } from '../services/api';
 
@@ -45,6 +49,8 @@ const CallManagementJoy: React.FC = () => {
     switch (status) {
       case 'incoming':
         return 'warning' as const;
+      case 'assigned':
+        return 'primary' as const;
       case 'active':
         return 'success' as const;
       case 'completed':
@@ -54,12 +60,13 @@ const CallManagementJoy: React.FC = () => {
     }
   };
 
-  const handleAnswerCall = async (callId: number) => {
+  const handleAnswerCall = async (call: Call) => {
     try {
-      await apiService.answerCall(callId, 1); // Using user ID 1 for now
+      await apiService.answerCall(call);
       await fetchActiveCalls();
     } catch (err) {
-      setError('Failed to answer call');
+      const message = err instanceof Error ? err.message : 'Failed to answer call';
+      setError(message);
       console.error('Error answering call:', err);
     }
   };
@@ -69,7 +76,8 @@ const CallManagementJoy: React.FC = () => {
       await apiService.endCall(callId);
       await fetchActiveCalls();
     } catch (err) {
-      setError('Failed to end call');
+      const message = err instanceof Error ? err.message : 'Failed to end call';
+      setError(message);
       console.error('Error ending call:', err);
     }
   };
@@ -78,11 +86,30 @@ const CallManagementJoy: React.FC = () => {
     await fetchActiveCalls();
   };
 
+  const handleInitializeRedis = async () => {
+    try {
+      const result = await apiService.initializeRedisStaffAvailability();
+      console.log('Redis initialization result:', result);
+      setError(null);
+      // Show success message
+      alert(`Redis initialized successfully! ${result.staffCount} staff members are now available.`);
+    } catch (err) {
+      setError('Failed to initialize Redis staff availability');
+      console.error('Error initializing Redis:', err);
+    }
+  };
 
   if (loading) {
     return (
       <AppLayout title="Call Management">
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '60vh',
+          }}
+        >
           <Typography level="body-md">Loading calls...</Typography>
         </Box>
       </AppLayout>
@@ -92,9 +119,22 @@ const CallManagementJoy: React.FC = () => {
   if (error) {
     return (
       <AppLayout title="Call Management">
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh', flexDirection: 'column', gap: 1 }}>
-          <Typography level="body-md" sx={{ color: 'danger.600' }}>{error}</Typography>
-          <Button variant="solid" onClick={fetchActiveCalls}>Retry</Button>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '60vh',
+            flexDirection: 'column',
+            gap: 1,
+          }}
+        >
+          <Typography level="body-md" sx={{ color: 'danger.600' }}>
+            {error}
+          </Typography>
+          <Button variant="solid" onClick={fetchActiveCalls}>
+            Retry
+          </Button>
         </Box>
       </AppLayout>
     );
@@ -106,7 +146,13 @@ const CallManagementJoy: React.FC = () => {
         Monitor and manage incoming calls across all locations
       </Typography>
 
-      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' } }}>
+      <Box
+        sx={{
+          display: 'grid',
+          gap: 2,
+          gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' },
+        }}
+      >
         {/* Active Calls */}
         <Card variant="outlined">
           <CardContent>
@@ -117,12 +163,17 @@ const CallManagementJoy: React.FC = () => {
               <Table
                 aria-label="active calls table"
                 size="md"
-                sx={{ '--TableCell-paddingY': '12px', '--TableCell-paddingX': '12px' }}
+                sx={{
+                  '--TableCell-paddingY': '12px',
+                  '--TableCell-paddingX': '12px',
+                }}
               >
                 <thead>
                   <tr>
-                    <th style={{ width: 220 }}>Caller</th>
-                    <th style={{ width: 220 }}>Location</th>
+                    <th style={{ width: 180 }}>Caller</th>
+                    <th style={{ width: 150 }}>Call Location</th>
+                    <th style={{ width: 150 }}>Assigned Staff</th>
+                    <th style={{ width: 150 }}>Staff Location</th>
                     <th>Status</th>
                     <th>Time</th>
                     <th>Actions</th>
@@ -131,8 +182,14 @@ const CallManagementJoy: React.FC = () => {
                 <tbody>
                   {activeCalls.map((call) => (
                     <tr key={call.id}>
-                      <td>{call.callerName || call.customer?.name || call.phoneNumber}</td>
-                      <td>{call.user?.location?.name || call.routedTo || 'Unassigned'}</td>
+                      <td>
+                        {call.callerName ||
+                          call.customer?.name ||
+                          call.phoneNumber}
+                      </td>
+                      <td>{call.location || 'General'}</td>
+                      <td>{call.user?.name || call.routedTo || '-'}</td>
+                      <td>{call.user?.location?.name || '-'}</td>
                       <td>
                         <Chip size="sm" color={getStatusColor(call.status)}>
                           {call.status}
@@ -147,7 +204,18 @@ const CallManagementJoy: React.FC = () => {
                               variant="solid"
                               color="success"
                               startDecorator={<CallIcon fontSize="small" />}
-                              onClick={() => handleAnswerCall(call.id)}
+                              onClick={() => handleAnswerCall(call)}
+                            >
+                              Answer
+                            </Button>
+                          )}
+                          {call.status === 'assigned' && (
+                            <Button
+                              size="sm"
+                              variant="solid"
+                              color="success"
+                              startDecorator={<CallIcon fontSize="small" />}
+                              onClick={() => handleAnswerCall(call)}
                             >
                               Answer
                             </Button>
@@ -180,9 +248,24 @@ const CallManagementJoy: React.FC = () => {
               <Typography level="title-md" gutterBottom>
                 Call Controls
               </Typography>
-              <Button fullWidth variant="solid" startDecorator={<RefreshIcon />} onClick={handleRefresh}>
-                Refresh Calls
-              </Button>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Button
+                  fullWidth
+                  variant="solid"
+                  startDecorator={<RefreshIcon />}
+                  onClick={handleRefresh}
+                >
+                  Refresh Calls
+                </Button>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  color="primary"
+                  onClick={handleInitializeRedis}
+                >
+                  Initialize Staff Availability
+                </Button>
+              </Box>
             </CardContent>
           </Card>
 
@@ -191,9 +274,15 @@ const CallManagementJoy: React.FC = () => {
               <Typography level="title-md" gutterBottom>
                 Today's Stats
               </Typography>
-              <Typography level="body-sm">Total Calls: {stats?.totalCalls ?? '—'}</Typography>
-              <Typography level="body-sm">Active: {stats?.activeCalls ?? '—'}</Typography>
-              <Typography level="body-sm">Completed: {stats?.completedCalls ?? '—'}</Typography>
+              <Typography level="body-sm">
+                Total Calls: {stats?.totalCalls ?? '—'}
+              </Typography>
+              <Typography level="body-sm">
+                Active: {stats?.activeCalls ?? '—'}
+              </Typography>
+              <Typography level="body-sm">
+                Completed: {stats?.completedCalls ?? '—'}
+              </Typography>
             </CardContent>
           </Card>
         </Box>
